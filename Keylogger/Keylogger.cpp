@@ -187,15 +187,6 @@ std::wstring Encrypt(std::wstring str)
     return res;
 }
 
-std::wstring Decrypt(std::wstring str)
-{
-    std::wstring res = L"";
-    for(int i = 0;i<str.length();++i)
-    {
-        res += (WCHAR)str[i]^0x4242;
-    }
-    return res;
-}
 
 void writeToFile(std::wstring str)
 {
